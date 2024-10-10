@@ -12,6 +12,7 @@
     "@vitejs/plugin-basic-ssl": "^1.1.0",
     "d3": "^7.9.0",
     "element-plus": "^2.8.4",
+    "unplugin-auto-import": "^0.18.3",
     "vue": "^3.5.10"
   },
   "devDependencies": {

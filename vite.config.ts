@@ -1,10 +1,12 @@
 import {defineConfig} from 'vite';
 import vue from '@vitejs/plugin-vue';
-// @ts-ignore
+import AutoImport from 'unplugin-auto-import/vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
-// https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [vue(), basicSsl()],
+  plugins: [vue(), basicSsl(), AutoImport({
+    imports: ['vue'], // 路径下自动生成文件夹存放全局指令
+    dts: 'src/auto-import.d.ts'
+  })],
   base: '/visualTree/',
   server: {
     host: '0.0.0.0',

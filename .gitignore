@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 visualTree
 dist-ssr
+dist
 *.local
 
 # Editor directories and files

@@ -4,7 +4,6 @@
 
 <script setup lang="ts">
 import * as d3 from 'd3';
-import {onMounted, ref} from 'vue';
 import DevicePng from '../../public/device.png';
 import DeviceErrorPng from '../../public/device_error.png';
 import DeviceDefaultPng from '../../public/device_default.png';

@@ -1,4 +1,5 @@
 import * as d3 from 'd3';
+import { createLogger } from 'vite';
 
 // 定义节点类型接口
 export interface Node {
@@ -43,6 +44,11 @@ export interface VisualTopoConfig {
 // 定义事件回调类型
 export type NodeClickHandler = (node: Node, event: MouseEvent) => void;
 export type LinkClickHandler = (link: Link, event: MouseEvent) => void;
+export type NodeDragHandler = (node: Node, x: number, y: number) => void;
+export type NodeDragEndHandler = (node: Node, finalX: number, finalY: number) => void;
+// 在文件开头的类型定义部分添加新的右键单击事件回调类型
+export type NodeRightClickHandler = (node: Node, event: MouseEvent) => void;
+export type LinkRightClickHandler = (link: Link, event: MouseEvent) => void;
 
 let svgSelection: d3.Selection<SVGSVGElement, unknown, null, undefined>;
 
@@ -56,7 +62,12 @@ export class VisualTopo {
     private nodeById: Map<string, Node>;
     private nodeClickHandlers: NodeClickHandler[] = [];
     private linkClickHandlers: LinkClickHandler[] = [];
-    private blinkTimers: Map<string, number> = new Map(); // 存储节点闪烁的定时器ID
+    private nodeRightClickHandlers: NodeRightClickHandler[] = []; // 新增节点右键单击事件处理器数组
+    private linkRightClickHandlers: LinkRightClickHandler[] = []; // 新增线条右键单击事件处理器数组
+    private nodeDragHandlers: NodeDragHandler[] = [];
+    private nodeDragEndHandlers: NodeDragEndHandler[] = [];
+    private blinkTimers: Map<string, number> = new Map();
+    private isDragging: boolean = false;
 
     constructor(svgElement: SVGSVGElement, config: VisualTopoConfig = {}) {
         this.svgElement = svgElement;
@@ -209,9 +220,9 @@ export class VisualTopo {
         // 定义反向箭头标记（用于双向箭头） - 不设置固定颜色
         defs.append('marker')
             .attr('id', 'reverseArrowhead')
-            .attr('viewBox', '0 0 10 10')
-            .attr('refX', '2')
-            .attr('refY', '5')
+            .attr('viewBox', '0 -5 10 10')
+            .attr('refX', '0')
+            .attr('refY', '0')
             .attr('markerWidth', '6')
             .attr('markerHeight', '6')
             .attr('orient', 'auto-start-reverse')
@@ -256,7 +267,16 @@ export class VisualTopo {
             this.linkClickHandlers.forEach(handler => handler(d, event));
             // 阻止事件冒泡到SVG或其他元素
             event.stopPropagation();
-        });
+        })
+            // 新增右键单击事件监听器
+            .on('contextmenu', (event, d) => {
+                event.preventDefault(); // 阻止默认的右键菜单
+                // 触发所有注册的线条右键点击事件处理器
+                this.linkRightClickHandlers.forEach(handler => handler(d, event));
+                // 阻止事件冒泡到SVG或其他元素
+                event.stopPropagation();
+            });
+        ;
 
         // 设置箭头颜色与线条颜色保持一致
         // 我们需要在路径元素创建后设置marker的颜色
@@ -347,6 +367,7 @@ export class VisualTopo {
     }
 
     // 渲染节点
+    // 在renderNodes方法中添加节点右键点击事件监听器
     private renderNodes(): void {
         // 清除之前的闪烁定时器
         this.clearAllBlinkTimers();
@@ -354,8 +375,8 @@ export class VisualTopo {
         // 保存当前this上下文，以便在回调中使用
         const self = this;
 
-        svgSelection.selectAll('image')
-            .data(this.nodes, d => (d as Node).id) // 使用id作为键函数
+        const images = svgSelection.selectAll('image')
+            .data(this.nodes, d => (d as Node).id)
             .enter()
             .append('image')
             // 设置图片位置和大小
@@ -366,8 +387,24 @@ export class VisualTopo {
             .attr('href', d => d.image)
             .style('cursor', 'pointer')
             .on('click', (event, d) => {
+                // 如果正在拖动，则不触发点击事件
+                if (this.isDragging) {
+                    this.isDragging = false;
+                    return;
+                }
                 // 触发所有注册的节点点击事件处理器
                 this.nodeClickHandlers.forEach(handler => handler(d, event));
+            })
+            // 新增右键单击事件监听器
+            .on('contextmenu', (event, d) => {
+                event.preventDefault(); // 阻止默认的右键菜单
+                // 如果正在拖动，则不触发右键点击事件
+                if (this.isDragging) {
+                    this.isDragging = false;
+                    return;
+                }
+                // 触发所有注册的节点右键点击事件处理器
+                this.nodeRightClickHandlers.forEach(handler => handler(d, event));
             })
             // 为每个节点绑定数据，便于后续闪烁操作
             .datum(function (d) {
@@ -389,6 +426,64 @@ export class VisualTopo {
                     self.blinkTimers.set(d.id, timerId);
                 }
             });
+
+        // 添加拖拽功能
+        const drag = d3.drag<SVGImageElement, Node>() // 修正类型为SVGImageElement
+            .on('start', (event, d) => {
+                self.isDragging = true;
+                // 提升被拖动节点的z-index
+                d3.select(event.currentTarget).raise();
+            })
+            .on('drag', (event, d) => {
+                // 更新节点位置数据
+                d.x = event.x;
+                d.y = event.y;
+
+                // 更新节点图标位置
+                svgSelection.selectAll('image')
+                    .filter((t: any) => t.id === d.id)
+                    .attr('x', d.x - d.w)
+                    .attr('y', d.y - d.h);
+
+                // 更新节点标签位置
+                svgSelection.selectAll('text')
+                    .filter((t: any) => t.id === d.id)
+                    .attr('x', d.x)
+                    .attr('y', d.y + d.h + 20);
+
+                // 更新相关连线
+                self.updateLinks(d.id);
+
+                // 触发拖拽事件处理器
+                self.nodeDragHandlers.forEach(handler => handler(d, d.x, d.y));
+            })
+            .on('end', (event, d) => {
+                self.isDragging = false;
+                // 触发拖拽完成事件处理器
+                self.nodeDragEndHandlers.forEach(handler => handler(d, d.x, d.y));
+            });
+
+        // 应用拖拽功能到节点
+        images.call(drag); // 移除不必要的类型断言
+    }
+
+    // 更新与指定节点相关的连线
+    private updateLinks(nodeId: string): void {
+        const self = this; // 关键修复：在方法内定义self变量保存当前实例引用
+        svgSelection.selectAll('g.link-group').each(function (this: d3.BaseType, datum: unknown) {
+            const link = datum as Link;
+            if (link.source === nodeId || link.target === nodeId) {
+                const sourceNode = self.nodeById.get(link.source);
+                const targetNode = self.nodeById.get(link.target);
+                if (sourceNode && targetNode) {
+                    const sourceIntersection = self.calculateIntersection(sourceNode, targetNode);
+                    const targetIntersection = self.calculateIntersection(targetNode, sourceNode);
+
+                    d3.select(this).select('path.link')
+                        .attr('d', `M ${sourceIntersection.x} ${sourceIntersection.y} L ${targetIntersection.x} ${targetIntersection.y}`);
+                }
+            }
+        });
     }
 
     // 渲染文本标签
@@ -438,6 +533,13 @@ export class VisualTopo {
         this.clear();
     }
 
+    getGraph() {
+        return {
+            nodes: this.nodes,
+            links: this.links
+        }
+    }
+
     // 注册节点点击事件处理器
     onNodeClick(handler: NodeClickHandler): void {
         this.nodeClickHandlers.push(handler);
@@ -448,9 +550,33 @@ export class VisualTopo {
         this.linkClickHandlers.push(handler);
     }
 
-    // 移除所有事件处理器
+    // 注册节点拖拽事件处理器
+    onNodeDrag(handler: NodeDragHandler): void {
+        this.nodeDragHandlers.push(handler);
+    }
+
+    // 注册节点拖拽完成事件处理器 - 新增方法
+    onNodeDragEnd(handler: NodeDragEndHandler): void {
+        this.nodeDragEndHandlers.push(handler);
+    }
+
+    // 注册节点右键点击事件处理器
+    onNodeRightClick(handler: NodeRightClickHandler): void {
+        this.nodeRightClickHandlers.push(handler);
+    }
+
+    // 注册线条右键点击事件处理器
+    onLinkRightClick(handler: LinkRightClickHandler): void {
+        this.linkRightClickHandlers.push(handler);
+    }
+
+    // 修改removeAllEventHandlers方法，添加清除拖拽事件处理器
     removeAllEventHandlers(): void {
         this.nodeClickHandlers = [];
         this.linkClickHandlers = [];
+        this.nodeRightClickHandlers = [];
+        this.linkRightClickHandlers = [];
+        this.nodeDragHandlers = [];
+        this.nodeDragEndHandlers = [];
     }
 }

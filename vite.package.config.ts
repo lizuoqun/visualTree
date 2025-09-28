@@ -20,7 +20,7 @@ export default defineConfig({
       }
     },
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: false,
     // 不复制public目录到dist
     copyPublicDir: false
   },

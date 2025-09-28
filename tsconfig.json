@@ -73,7 +73,7 @@
     "src/**/*",
     "vite.config.*",
     "*.d.ts"
-  ],
+, "lib/visualTopo.ts"  ],
   "exclude": [
     "node_modules",
     "dist"

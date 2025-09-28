@@ -1,7 +1,7 @@
 {
   "name": "visual-topo",
   "private": false,
-  "version": "0.0.0",
+  "version": "0.0.2",
   "type": "module",
   "main": "dist/visualTopo.umd.js",
   "module": "dist/visualTopo.es.js",
@@ -34,7 +34,8 @@
     "vue-tsc": "^2.1.6"
   },
   "files": [
-    "dist"
+    "dist",
+    "lib"
   ],
   "keywords": [
     "d3",

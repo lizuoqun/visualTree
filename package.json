@@ -1,25 +1,48 @@
 {
-  "name": "visualtree",
-  "private": true,
+  "name": "visual-topo",
+  "private": false,
   "version": "0.0.0",
   "type": "module",
+  "main": "dist/visualTopo.umd.js",
+  "module": "dist/visualTopo.es.js",
+  "types": "dist/visualTopo.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/visualTopo.es.js",
+      "require": "./dist/visualTopo.umd.js",
+      "types": "./dist/visualTopo.d.ts"
+    }
+  },
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:package": "vite build --config vite.package.config.ts"
   },
   "dependencies": {
-    "@vitejs/plugin-basic-ssl": "^1.1.0",
-    "d3": "^7.9.0",
-    "element-plus": "^2.8.4",
-    "unplugin-auto-import": "^0.18.3",
-    "vue": "^3.5.10"
+    "d3": "^7.9.0"
+  },
+  "peerDependencies": {
+    "d3": "^7.0.0"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",
     "@vitejs/plugin-vue": "^5.1.4",
     "typescript": "^5.5.3",
     "vite": "^5.4.8",
+    "vue": "^3.5.10",
     "vue-tsc": "^2.1.6"
-  }
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "d3",
+    "visualization",
+    "topology",
+    "vue"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "description": "A D3.js based topology visualization component"
 }
